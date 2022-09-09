@@ -110,8 +110,8 @@ func NewController(
 		kubeclientset:         kubeclientset,
 		servicesLister:        serviceInformer.Lister(),
 		servicesSynced:        serviceInformer.Informer().HasSynced,
-		networkpoliciesLister: networkPoliciesInformer.Lister(),
-		networkpoliciesSynced: networkPoliciesInformer.Informer().HasSynced,
+		networkpoliciesLister: networkPoliciesInformer.Lister(),             // TODO: Cannot be nil here
+		networkpoliciesSynced: networkPoliciesInformer.Informer().HasSynced, // TODO: Cannot be nil here
 		workqueue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Jobs"),
 		recorder:              recorder,
 		worker:                NewWorker(l3portmanager, portmapper, kubeclientset, serviceInformer.Lister(), generator, agentController),
@@ -174,19 +174,22 @@ func NewController(
 		})
 	}
 
-	networkPoliciesInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.handleObject,
-		UpdateFunc: func(old, new interface{}) {
-			klog.Info("UpdateFunc called")
-			/* if newDepl.ResourceVersion == oldDepl.ResourceVersion {
-				// Periodic resync will send update events for all known Deployments.
-				// Two different versions of the same Deployment will always have different RVs.
-				return
-			} */
-			controller.handleObject(new)
-		},
-		DeleteFunc: controller.deleteObject,
-	})
+	// TODO: can be nil here. How CAN it actually become nil?
+	if networkPoliciesInformer != nil {
+		networkPoliciesInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: controller.handleObject,
+			UpdateFunc: func(old, new interface{}) {
+				klog.Info("UpdateFunc called")
+				/* if newDepl.ResourceVersion == oldDepl.ResourceVersion {
+					// Periodic resync will send update events for all known Deployments.
+					// Two different versions of the same Deployment will always have different RVs.
+					return
+				} */
+				controller.handleObject(new)
+			},
+			DeleteFunc: controller.deleteObject,
+		})
+	}
 
 	return controller, nil
 }
