@@ -20,12 +20,34 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
+type AllowedIPBlock struct {
+	Cidr   string   `json:"cidr"`
+	Except []string `json:"except"`
+}
+
+type PolicyPort struct {
+	Protocol corev1.Protocol `json:"protocol"`
+	Port     *int32          `json:"port,omitempty"`
+	EndPort  *int32          `json:"end-port,omitempty"`
+}
+
+type NetworkPolicy struct {
+	Name            string           `json:"name"`
+	AllowedIPBlocks []AllowedIPBlock `json:"allowed-ip-blocks"`
+	Ports           []PolicyPort     `json:"ports"`
+}
+
+type PolicyAssignment struct {
+	Address         string   `json:"address"`
+	NetworkPolicies []string `json:"network-policies"`
+}
+
 type PortForward struct {
 	Protocol             corev1.Protocol `json:"protocol"`
 	InboundPort          int32           `json:"inbound-port"`
 	DestinationAddresses []string        `json:"destination-addresses"`
 	DestinationPort      int32           `json:"destination-port"`
-	Policy               string          `json:"policy"`
+	Policy               string          `json:"policy"` // TODO: <== What does this do
 }
 
 type IngressIP struct {
@@ -34,7 +56,9 @@ type IngressIP struct {
 }
 
 type LoadBalancer struct {
-	Ingress []IngressIP `json:"ingress"`
+	Ingress           []IngressIP        `json:"ingress"`
+	NetworkPolicies   []NetworkPolicy    `json:"network-policies"`
+	PolicyAssignments []PolicyAssignment `json:"policy-assignments"`
 }
 
 type ConfigClaim struct {

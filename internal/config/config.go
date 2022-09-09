@@ -64,6 +64,7 @@ type Nftables struct {
 	NATPostroutingChainName string `toml:"nat-postrouting-chain"`
 	FWMarkBits              uint32 `toml:"fwmark-bits"`
 	FWMarkMask              uint32 `toml:"fwmark-mask"`
+	NPMarkBits              uint32 `toml:"npmark-bits"`
 
 	Service ServiceConfig `toml:"service"`
 }
@@ -152,6 +153,10 @@ func FillNftablesConfig(cfg *Nftables) {
 	if cfg.FWMarkBits == 0 {
 		cfg.FWMarkBits = 1
 		cfg.FWMarkMask = 1
+	}
+
+	if cfg.NPMarkBits == 0 {
+		cfg.NPMarkBits = 2
 	}
 
 	defaultStringList(&cfg.Service.ReloadCommand, []string{"sudo", "systemctl", "reload", "nftables"})

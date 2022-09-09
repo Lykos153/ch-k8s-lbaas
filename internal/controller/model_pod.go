@@ -18,7 +18,11 @@ import (
 	goerrors "errors"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1"
 
 	"k8s.io/klog"
 
@@ -31,19 +35,25 @@ var (
 )
 
 type PodLoadBalancerModelGenerator struct {
-	l3portmanager openstack.L3PortManager
-	services      corelisters.ServiceLister
-	endpoints     corelisters.EndpointsLister
+	l3portmanager   openstack.L3PortManager
+	services        corelisters.ServiceLister
+	networkpolicies networkinglisters.NetworkPolicyLister
+	endpoints       corelisters.EndpointsLister
+	pods            corelisters.PodLister
 }
 
 func NewPodLoadBalancerModelGenerator(
 	l3portmanager openstack.L3PortManager,
 	services corelisters.ServiceLister,
-	endpoints corelisters.EndpointsLister) *PodLoadBalancerModelGenerator {
+	endpoints corelisters.EndpointsLister,
+	networkpolicies networkinglisters.NetworkPolicyLister,
+	pods corelisters.PodLister) *PodLoadBalancerModelGenerator {
 	return &PodLoadBalancerModelGenerator{
-		l3portmanager: l3portmanager,
-		services:      services,
-		endpoints:     endpoints,
+		l3portmanager:   l3portmanager,
+		services:        services,
+		endpoints:       endpoints,
+		networkpolicies: networkpolicies,
+		pods:            pods,
 	}
 }
 
@@ -71,8 +81,95 @@ func (g *PodLoadBalancerModelGenerator) findPort(subset *corev1.EndpointSubset, 
 	return -1, errPortNotFoundInSubset
 }
 
+func containsPort(port int32, proto *corev1.Protocol, portList []networkingv1.NetworkPolicyPort) bool {
+	klog.Infof("Looking for port %d proto %#v", port, *proto)
+	for _, p := range portList {
+		klog.Infof("%#v: port %d proto %#v", p, p.Port.IntVal, p.Protocol)
+		if *p.Protocol == *proto &&
+			((p.EndPort == nil && p.Port.IntVal == port) ||
+				(p.EndPort != nil && p.Port.IntVal <= port && *p.EndPort >= port)) {
+			klog.Infof("Found port in %#v", p)
+			return true
+		}
+	}
+	return false
+}
+
+func buildNetworkPolicy(in *networkingv1.NetworkPolicy) model.NetworkPolicy {
+	newPolicy := model.NetworkPolicy{
+		Name:            in.Name,
+		AllowedIPBlocks: []model.AllowedIPBlock{},
+		Ports:           []model.PolicyPort{},
+	}
+	for _, ingress := range in.Spec.Ingress {
+		klog.Infof("Processing ingress %#v", ingress)
+		for _, port := range ingress.Ports {
+			newPort := model.PolicyPort{
+				Protocol: *port.Protocol,
+				EndPort:  port.EndPort,
+			}
+			if port.Port != nil {
+				newPort.Port = &port.Port.IntVal
+			}
+			klog.Infof("Adding proto %s port %d to %d",
+				newPort.Protocol, newPort.Port, newPort.EndPort)
+			newPolicy.Ports = append(newPolicy.Ports, newPort)
+		}
+		for _, from := range ingress.From {
+			if from.IPBlock == nil {
+				continue
+			}
+			newBlock := model.AllowedIPBlock{
+				Cidr: from.IPBlock.CIDR,
+			}
+			for _, except := range from.IPBlock.Except {
+				newBlock.Except = append(newBlock.Except, except)
+			}
+			klog.Infof("Adding block %s with %d excepts",
+				newBlock.Cidr, len(newBlock.Except))
+			newPolicy.AllowedIPBlocks = append(newPolicy.AllowedIPBlocks, newBlock)
+		}
+	}
+	return newPolicy
+}
+
 func (g *PodLoadBalancerModelGenerator) GenerateModel(portAssignment map[string]string) (*model.LoadBalancer, error) {
 	result := &model.LoadBalancer{}
+
+	allPolicies, err := g.networkpolicies.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	networkPolicies := make([]model.NetworkPolicy, 0, len(allPolicies))
+	policyMap := map[string][]string{} // dest addr => ingress ipBlock
+	for _, pol := range allPolicies {
+		klog.Infof("Processing policy %s", pol.Name)
+		if len(pol.Spec.Ingress) == 0 {
+			klog.Infof("Skipping because policy has no ingress rule")
+			continue
+		}
+
+		networkPolicies = append(networkPolicies, buildNetworkPolicy(pol))
+
+		// build policyMap
+		selector, err := metav1.LabelSelectorAsSelector(&pol.Spec.PodSelector)
+		if err != nil {
+			return nil, err
+		}
+
+		pods, err := g.pods.Pods(pol.Namespace).List(selector)
+		if err != nil {
+			return nil, err
+		}
+		for _, pod := range pods {
+			for _, addr := range pod.Status.PodIPs {
+				klog.Infof("Adding policy %s to address %s", pol.Name, addr.IP)
+				policyMap[addr.IP] = append(policyMap[addr.IP], pol.Name)
+			}
+		}
+	}
+	klog.Infof("Done getting %d policies applying to %d addresses", len(allPolicies), len(policyMap))
 
 	ingressMap := map[string]model.IngressIP{}
 
@@ -156,6 +253,14 @@ func (g *PodLoadBalancerModelGenerator) GenerateModel(portAssignment map[string]
 	i := 0
 	for _, ingress := range ingressMap {
 		result.Ingress[i] = ingress
+		i++
+	}
+	result.NetworkPolicies = networkPolicies
+	result.PolicyAssignments = make([]model.PolicyAssignment, len(policyMap))
+	i = 0
+	for addr, policies := range policyMap {
+		result.PolicyAssignments[i].Address = addr
+		result.PolicyAssignments[i].NetworkPolicies = policies
 		i++
 	}
 
