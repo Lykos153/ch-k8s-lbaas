@@ -180,11 +180,6 @@ func NewController(
 			AddFunc: controller.handleObject,
 			UpdateFunc: func(old, new interface{}) {
 				klog.Info("UpdateFunc called")
-				/* if newDepl.ResourceVersion == oldDepl.ResourceVersion {
-					// Periodic resync will send update events for all known Deployments.
-					// Two different versions of the same Deployment will always have different RVs.
-					return
-				} */
 				controller.handleObject(new)
 			},
 			DeleteFunc: controller.deleteObject,
@@ -269,7 +264,7 @@ func (c *Controller) periodicCleanup() {
 func (c *Controller) handleObject(obj interface{}) {
 	var object metav1.Object
 	var ok bool
-	klog.Info("handleObject called")
+	klog.Infof("handleObject called with %T", obj)
 	if object, ok = obj.(metav1.Object); !ok {
 		klog.V(5).Infof("ignoring non-castable object in handleObject; expecting deletion event")
 		return

@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -70,13 +71,14 @@ var (
 )
 
 type Worker struct {
-	l3portmanager   openstack.L3PortManager
-	portmapper      PortMapper
-	servicesLister  corelisters.ServiceLister
-	kubeclientset   kubernetes.Interface
-	recorder        record.EventRecorder
-	generator       LoadBalancerModelGenerator
-	agentController AgentController
+	l3portmanager         openstack.L3PortManager
+	portmapper            PortMapper
+	servicesLister        corelisters.ServiceLister
+	networkpoliciesLister networkinglisters.NetworkPolicyLister
+	kubeclientset         kubernetes.Interface
+	recorder              record.EventRecorder
+	generator             LoadBalancerModelGenerator
+	agentController       AgentController
 
 	workqueue workqueue.RateLimitingInterface
 
@@ -444,6 +446,32 @@ func (j *SyncServiceJob) Run(w *Worker) (RequeueMode, error) {
 
 func (j *SyncServiceJob) ToString() string {
 	return fmt.Sprintf("SyncServiceJob(%q)", j.Service.ToKey())
+}
+
+type SyncNetworkPolicyJob struct {
+	NetworkPolicy model.NetworkPolicyIdentifier
+}
+
+func (j *SyncNetworkPolicyJob) Run(w *Worker) (RequeueMode, error) {
+	// pol, err := w.networkpoliciesLister.NetworkPolicies(j.NetworkPolicy.Namespace).Get(j.NetworkPolicy.Name)
+	// if err != nil {
+	// 	if errors.IsNotFound(err) {
+	// 		// We do nothing here. We expect the listener to provide us with a
+	// 		// deleted event. The deleted event is handled differently.
+	// 		return Drop, err
+	// 	}
+	// 	return RequeueTail, err
+	// }
+
+	// The work queue deduplicates jobs. In addition, the cleanup barrier will
+	// prevent execution of the update config job (with requeue) so that no
+	// harmful config will be generated during initial sync.
+	w.EnqueueJob(&UpdateConfigJob{})
+	return Drop, nil
+}
+
+func (j *SyncNetworkPolicyJob) ToString() string {
+	return fmt.Sprintf("SyncNetworkPolicyJob(%q)", j.NetworkPolicy.ToKey())
 }
 
 type RemoveServiceJob struct {
