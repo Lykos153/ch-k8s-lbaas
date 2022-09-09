@@ -41,8 +41,8 @@ type PodLoadBalancerModelGenerator struct {
 func NewPodLoadBalancerModelGenerator(
 	l3portmanager openstack.L3PortManager,
 	services corelisters.ServiceLister,
-	networkpolicies networkinglisters.NetworkPolicyLister,
-	endpoints corelisters.EndpointsLister) *PodLoadBalancerModelGenerator {
+	endpoints corelisters.EndpointsLister,
+	networkpolicies networkinglisters.NetworkPolicyLister) *PodLoadBalancerModelGenerator {
 	return &PodLoadBalancerModelGenerator{
 		l3portmanager: l3portmanager,
 		services:      services,

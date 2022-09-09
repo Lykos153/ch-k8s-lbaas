@@ -33,21 +33,21 @@ func NewLoadBalancerModelGenerator(
 	backendLayer config.BackendLayer,
 	l3portmanager openstack.L3PortManager,
 	services corelisters.ServiceLister,
-	networkpolicies networkinglisters.NetworkPolicyLister,
 	nodes corelisters.NodeLister,
-	endpoints corelisters.EndpointsLister) (LoadBalancerModelGenerator, error) {
+	endpoints corelisters.EndpointsLister,
+	networkpolicies networkinglisters.NetworkPolicyLister) (LoadBalancerModelGenerator, error) {
 	switch backendLayer {
 	case config.BackendLayerNodePort:
 		return NewNodePortLoadBalancerModelGenerator(
-			l3portmanager, services, networkpolicies, nodes,
+			l3portmanager, services, nodes,
 		), nil
 	case config.BackendLayerClusterIP:
 		return NewClusterIPLoadBalancerModelGenerator(
 			l3portmanager, services,
-			networkpolicies), nil
+		), nil
 	case config.BackendLayerPod:
 		return NewPodLoadBalancerModelGenerator(
-			l3portmanager, services, networkpolicies, endpoints,
+			l3portmanager, services, endpoints, networkpolicies,
 		), nil
 	default:
 		return nil, fmt.Errorf("invalid backend type: %q", backendLayer)

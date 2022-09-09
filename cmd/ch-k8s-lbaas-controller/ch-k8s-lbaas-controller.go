@@ -97,9 +97,9 @@ func main() {
 		fileCfg.BackendLayer,
 		l3portmanager,
 		servicesInformer.Lister(),
-		networkPoliciesInformer.Lister(),
 		nodesInformer.Lister(),
 		endpointsInformer.Lister(),
+		networkPoliciesInformer.Lister(),
 	)
 
 	if fileCfg.BackendLayer != config.BackendLayerNodePort {
@@ -117,9 +117,9 @@ func main() {
 	lbcontroller, err := controller.NewController(
 		kubeClient,
 		servicesInformer,
-		networkPoliciesInformer,
 		nodesInformer,
 		endpointsInformer,
+		networkPoliciesInformer,
 		l3portmanager,
 		agentController,
 		modelGenerator,

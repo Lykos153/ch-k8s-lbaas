@@ -84,9 +84,9 @@ type Controller struct {
 func NewController(
 	kubeclientset kubernetes.Interface,
 	serviceInformer coreinformers.ServiceInformer,
-	networkPoliciesInformer networkinginformers.NetworkPolicyInformer,
 	nodeInformer coreinformers.NodeInformer,
 	endpointsInformer coreinformers.EndpointsInformer,
+	networkPoliciesInformer networkinginformers.NetworkPolicyInformer,
 	l3portmanager openstack.L3PortManager,
 	agentController AgentController,
 	generator LoadBalancerModelGenerator,
@@ -138,20 +138,6 @@ func NewController(
 		DeleteFunc: controller.deleteObject,
 	})
 
-	networkPoliciesInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.handleObject,
-		UpdateFunc: func(old, new interface{}) {
-			klog.Info("UpdateFunc called")
-			/* if newDepl.ResourceVersion == oldDepl.ResourceVersion {
-				// Periodic resync will send update events for all known Deployments.
-				// Two different versions of the same Deployment will always have different RVs.
-				return
-			} */
-			controller.handleObject(new)
-		},
-		DeleteFunc: controller.deleteObject,
-	})
-
 	if nodeInformer != nil {
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: controller.handleAuxUpdated,
@@ -187,6 +173,20 @@ func NewController(
 			DeleteFunc: controller.handleAuxUpdated,
 		})
 	}
+
+	networkPoliciesInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObject,
+		UpdateFunc: func(old, new interface{}) {
+			klog.Info("UpdateFunc called")
+			/* if newDepl.ResourceVersion == oldDepl.ResourceVersion {
+				// Periodic resync will send update events for all known Deployments.
+				// Two different versions of the same Deployment will always have different RVs.
+				return
+			} */
+			controller.handleObject(new)
+		},
+		DeleteFunc: controller.deleteObject,
+	})
 
 	return controller, nil
 }

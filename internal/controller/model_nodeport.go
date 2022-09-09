@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	networkinglisters "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/klog"
 
 	"github.com/cloudandheat/ch-k8s-lbaas/internal/model"
@@ -42,7 +41,6 @@ type NodePortLoadBalancerModelGenerator struct {
 func NewNodePortLoadBalancerModelGenerator(
 	l3portmanager openstack.L3PortManager,
 	services corelisters.ServiceLister,
-	networkpolicies networkinglisters.NetworkPolicyLister,
 	nodes corelisters.NodeLister) *NodePortLoadBalancerModelGenerator {
 	return &NodePortLoadBalancerModelGenerator{
 		l3portmanager: l3portmanager,
