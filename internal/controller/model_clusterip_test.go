@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
@@ -33,9 +34,10 @@ type clusterIPGeneratorFixture struct {
 
 	l3portmanager *ostesting.MockL3PortManager
 
-	kubeclient    *k8sfake.Clientset
-	serviceLister []*corev1.Service
-	kubeobjects   []runtime.Object
+	kubeclient          *k8sfake.Clientset
+	serviceLister       []*corev1.Service
+	networkpolicyLister []*networkingv1.NetworkPolicy
+	kubeobjects         []runtime.Object
 }
 
 func newClusterIPGeneratorFixture(t *testing.T) *clusterIPGeneratorFixture {
@@ -43,6 +45,7 @@ func newClusterIPGeneratorFixture(t *testing.T) *clusterIPGeneratorFixture {
 	f.t = t
 	f.l3portmanager = ostesting.NewMockL3PortManager()
 	f.serviceLister = []*corev1.Service{}
+	f.networkpolicyLister = []*networkingv1.NetworkPolicy{}
 	f.kubeobjects = []runtime.Object{}
 
 	return f
@@ -52,14 +55,20 @@ func (f *clusterIPGeneratorFixture) newGenerator() (*ClusterIPLoadBalancerModelG
 	f.kubeclient = k8sfake.NewSimpleClientset(f.kubeobjects...)
 	k8sI := kubeinformers.NewSharedInformerFactory(f.kubeclient, noResyncPeriodFunc())
 	services := k8sI.Core().V1().Services()
+	networkpolicies := k8sI.Networking().V1().NetworkPolicies()
 
 	for _, s := range f.serviceLister {
 		services.Informer().GetIndexer().Add(s)
 	}
 
+	for _, s := range f.networkpolicyLister {
+		networkpolicies.Informer().GetIndexer().Add(s)
+	}
+
 	g := NewClusterIPLoadBalancerModelGenerator(
 		f.l3portmanager,
 		services.Lister(),
+		networkpolicies.Lister(),
 	)
 	return g, k8sI
 }
@@ -67,6 +76,11 @@ func (f *clusterIPGeneratorFixture) newGenerator() (*ClusterIPLoadBalancerModelG
 func (f *clusterIPGeneratorFixture) addService(svc *corev1.Service) {
 	f.serviceLister = append(f.serviceLister, svc)
 	f.kubeobjects = append(f.kubeobjects, svc)
+}
+
+func (f *clusterIPGeneratorFixture) addNetworkpolicy(pol *networkingv1.NetworkPolicy) {
+	f.networkpolicyLister = append(f.networkpolicyLister, pol)
+	f.kubeobjects = append(f.kubeobjects, pol)
 }
 
 func (f *clusterIPGeneratorFixture) runWith(body func(g *ClusterIPLoadBalancerModelGenerator)) {

@@ -19,6 +19,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1"
 
 	"k8s.io/klog"
 
@@ -31,14 +32,16 @@ var (
 )
 
 type PodLoadBalancerModelGenerator struct {
-	l3portmanager openstack.L3PortManager
-	services      corelisters.ServiceLister
-	endpoints     corelisters.EndpointsLister
+	l3portmanager   openstack.L3PortManager
+	services        corelisters.ServiceLister
+	networkpolicies networkinglisters.NetworkPolicyLister
+	endpoints       corelisters.EndpointsLister
 }
 
 func NewPodLoadBalancerModelGenerator(
 	l3portmanager openstack.L3PortManager,
 	services corelisters.ServiceLister,
+	networkpolicies networkinglisters.NetworkPolicyLister,
 	endpoints corelisters.EndpointsLister) *PodLoadBalancerModelGenerator {
 	return &PodLoadBalancerModelGenerator{
 		l3portmanager: l3portmanager,

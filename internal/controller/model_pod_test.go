@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -35,10 +36,11 @@ type podGeneratorFixture struct {
 
 	l3portmanager *ostesting.MockL3PortManager
 
-	kubeclient      *k8sfake.Clientset
-	serviceLister   []*corev1.Service
-	endpointsLister []*corev1.Endpoints
-	kubeobjects     []runtime.Object
+	kubeclient          *k8sfake.Clientset
+	serviceLister       []*corev1.Service
+	networkpolicyLister []*networkingv1.NetworkPolicy
+	endpointsLister     []*corev1.Endpoints
+	kubeobjects         []runtime.Object
 }
 
 func newPodGeneratorFixture(t *testing.T) *podGeneratorFixture {
@@ -46,6 +48,7 @@ func newPodGeneratorFixture(t *testing.T) *podGeneratorFixture {
 	f.t = t
 	f.l3portmanager = ostesting.NewMockL3PortManager()
 	f.serviceLister = []*corev1.Service{}
+	f.networkpolicyLister = []*networkingv1.NetworkPolicy{}
 	f.endpointsLister = []*corev1.Endpoints{}
 	f.kubeobjects = []runtime.Object{}
 
@@ -56,10 +59,15 @@ func (f *podGeneratorFixture) newGenerator() (*PodLoadBalancerModelGenerator, ku
 	f.kubeclient = k8sfake.NewSimpleClientset(f.kubeobjects...)
 	k8sI := kubeinformers.NewSharedInformerFactory(f.kubeclient, noResyncPeriodFunc())
 	services := k8sI.Core().V1().Services()
+	networkpolicies := k8sI.Networking().V1().NetworkPolicies()
 	endpoints := k8sI.Core().V1().Endpoints()
 
 	for _, s := range f.serviceLister {
 		services.Informer().GetIndexer().Add(s)
+	}
+
+	for _, s := range f.networkpolicyLister {
+		networkpolicies.Informer().GetIndexer().Add(s)
 	}
 
 	for _, e := range f.endpointsLister {
@@ -69,6 +77,7 @@ func (f *podGeneratorFixture) newGenerator() (*PodLoadBalancerModelGenerator, ku
 	g := NewPodLoadBalancerModelGenerator(
 		f.l3portmanager,
 		services.Lister(),
+		networkpolicies.Lister(),
 		endpoints.Lister(),
 	)
 	return g, k8sI
@@ -77,6 +86,11 @@ func (f *podGeneratorFixture) newGenerator() (*PodLoadBalancerModelGenerator, ku
 func (f *podGeneratorFixture) addService(svc *corev1.Service) {
 	f.serviceLister = append(f.serviceLister, svc)
 	f.kubeobjects = append(f.kubeobjects, svc)
+}
+
+func (f *podGeneratorFixture) addNetworkpolicy(pol *networkingv1.NetworkPolicy) {
+	f.networkpolicyLister = append(f.networkpolicyLister, pol)
+	f.kubeobjects = append(f.kubeobjects, pol)
 }
 
 func (f *podGeneratorFixture) addEndpoints(svc *corev1.Endpoints) {

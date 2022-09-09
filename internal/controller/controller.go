@@ -27,10 +27,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	networkinginformers "k8s.io/client-go/informers/networking/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -60,8 +62,10 @@ type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
 	kubeclientset kubernetes.Interface
 
-	servicesLister corelisters.ServiceLister
-	servicesSynced cache.InformerSynced
+	servicesLister        corelisters.ServiceLister
+	servicesSynced        cache.InformerSynced
+	networkpoliciesLister networkinglisters.NetworkPolicyLister
+	networkpoliciesSynced cache.InformerSynced
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens. This
@@ -80,6 +84,7 @@ type Controller struct {
 func NewController(
 	kubeclientset kubernetes.Interface,
 	serviceInformer coreinformers.ServiceInformer,
+	networkPoliciesInformer networkinginformers.NetworkPolicyInformer,
 	nodeInformer coreinformers.NodeInformer,
 	endpointsInformer coreinformers.EndpointsInformer,
 	l3portmanager openstack.L3PortManager,
@@ -102,12 +107,14 @@ func NewController(
 	)
 
 	controller := &Controller{
-		kubeclientset:  kubeclientset,
-		servicesLister: serviceInformer.Lister(),
-		servicesSynced: serviceInformer.Informer().HasSynced,
-		workqueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Jobs"),
-		recorder:       recorder,
-		worker:         NewWorker(l3portmanager, portmapper, kubeclientset, serviceInformer.Lister(), generator, agentController),
+		kubeclientset:         kubeclientset,
+		servicesLister:        serviceInformer.Lister(),
+		servicesSynced:        serviceInformer.Informer().HasSynced,
+		networkpoliciesLister: networkPoliciesInformer.Lister(),
+		networkpoliciesSynced: networkPoliciesInformer.Informer().HasSynced,
+		workqueue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Jobs"),
+		recorder:              recorder,
+		worker:                NewWorker(l3portmanager, portmapper, kubeclientset, serviceInformer.Lister(), generator, agentController),
 	}
 
 	klog.Info("Setting up event handlers")
@@ -118,6 +125,20 @@ func NewController(
 	// handling Deployment resources. More info on this pattern:
 	// https://github.com/kubernetes/community/blob/8cafef897a22026d42f5e5bb3f104febe7e29830/contributors/devel/controllers.md
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObject,
+		UpdateFunc: func(old, new interface{}) {
+			klog.Info("UpdateFunc called")
+			/* if newDepl.ResourceVersion == oldDepl.ResourceVersion {
+				// Periodic resync will send update events for all known Deployments.
+				// Two different versions of the same Deployment will always have different RVs.
+				return
+			} */
+			controller.handleObject(new)
+		},
+		DeleteFunc: controller.deleteObject,
+	})
+
+	networkPoliciesInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.handleObject,
 		UpdateFunc: func(old, new interface{}) {
 			klog.Info("UpdateFunc called")

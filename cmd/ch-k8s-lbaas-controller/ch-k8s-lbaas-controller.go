@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
@@ -90,11 +91,13 @@ func main() {
 	servicesInformer := kubeInformerFactory.Core().V1().Services()
 	nodesInformer := kubeInformerFactory.Core().V1().Nodes()
 	endpointsInformer := kubeInformerFactory.Core().V1().Endpoints()
+	networkPoliciesInformer := kubeInformerFactory.Networking().V1().NetworkPolicies()
 
 	modelGenerator, err := controller.NewLoadBalancerModelGenerator(
 		fileCfg.BackendLayer,
 		l3portmanager,
 		servicesInformer.Lister(),
+		networkPoliciesInformer.Lister(),
 		nodesInformer.Lister(),
 		endpointsInformer.Lister(),
 	)
@@ -114,6 +117,7 @@ func main() {
 	lbcontroller, err := controller.NewController(
 		kubeClient,
 		servicesInformer,
+		networkPoliciesInformer,
 		nodesInformer,
 		endpointsInformer,
 		l3portmanager,

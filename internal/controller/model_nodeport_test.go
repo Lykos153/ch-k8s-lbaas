@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -35,10 +36,11 @@ type nodePortGeneratorFixture struct {
 
 	l3portmanager *ostesting.MockL3PortManager
 
-	kubeclient    *k8sfake.Clientset
-	serviceLister []*corev1.Service
-	nodeLister    []*corev1.Node
-	kubeobjects   []runtime.Object
+	kubeclient          *k8sfake.Clientset
+	serviceLister       []*corev1.Service
+	networkpolicyLister []*networkingv1.NetworkPolicy
+	nodeLister          []*corev1.Node
+	kubeobjects         []runtime.Object
 }
 
 func newNodePortGeneratorFixture(t *testing.T) *nodePortGeneratorFixture {
@@ -46,6 +48,7 @@ func newNodePortGeneratorFixture(t *testing.T) *nodePortGeneratorFixture {
 	f.t = t
 	f.l3portmanager = ostesting.NewMockL3PortManager()
 	f.serviceLister = []*corev1.Service{}
+	f.networkpolicyLister = []*networkingv1.NetworkPolicy{}
 	f.nodeLister = []*corev1.Node{}
 	f.kubeobjects = []runtime.Object{}
 
@@ -77,10 +80,15 @@ func (f *nodePortGeneratorFixture) newGenerator() (*NodePortLoadBalancerModelGen
 	f.kubeclient = k8sfake.NewSimpleClientset(f.kubeobjects...)
 	k8sI := kubeinformers.NewSharedInformerFactory(f.kubeclient, noResyncPeriodFunc())
 	services := k8sI.Core().V1().Services()
+	networkpolicies := k8sI.Networking().V1().NetworkPolicies()
 	nodes := k8sI.Core().V1().Nodes()
 
 	for _, s := range f.serviceLister {
 		services.Informer().GetIndexer().Add(s)
+	}
+
+	for _, p := range f.networkpolicyLister {
+		networkpolicies.Informer().GetIndexer().Add(p)
 	}
 
 	for _, n := range f.nodeLister {
@@ -90,6 +98,7 @@ func (f *nodePortGeneratorFixture) newGenerator() (*NodePortLoadBalancerModelGen
 	g := NewNodePortLoadBalancerModelGenerator(
 		f.l3portmanager,
 		services.Lister(),
+		networkpolicies.Lister(),
 		nodes.Lister(),
 	)
 	return g, k8sI
@@ -98,6 +107,11 @@ func (f *nodePortGeneratorFixture) newGenerator() (*NodePortLoadBalancerModelGen
 func (f *nodePortGeneratorFixture) addService(svc *corev1.Service) {
 	f.serviceLister = append(f.serviceLister, svc)
 	f.kubeobjects = append(f.kubeobjects, svc)
+}
+
+func (f *nodePortGeneratorFixture) addNetworkpolicy(pol *networkingv1.NetworkPolicy) {
+	f.networkpolicyLister = append(f.networkpolicyLister, pol)
+	f.kubeobjects = append(f.kubeobjects, pol)
 }
 
 func (f *nodePortGeneratorFixture) runWith(body func(g *NodePortLoadBalancerModelGenerator)) {
