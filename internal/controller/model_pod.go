@@ -44,9 +44,10 @@ func NewPodLoadBalancerModelGenerator(
 	endpoints corelisters.EndpointsLister,
 	networkpolicies networkinglisters.NetworkPolicyLister) *PodLoadBalancerModelGenerator {
 	return &PodLoadBalancerModelGenerator{
-		l3portmanager: l3portmanager,
-		services:      services,
-		endpoints:     endpoints,
+		l3portmanager:   l3portmanager,
+		services:        services,
+		endpoints:       endpoints,
+		networkpolicies: networkpolicies,
 	}
 }
 
