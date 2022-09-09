@@ -1,0 +1,29 @@
+https://kubernetes.io/docs/concepts/services-networking/network-policies/
+
+rules should look like this:
+
+# if only except roule 
+table inet filter {
+	chain forward {
+		ct mark 0x1 and 0x1 ip saddr 93.202.132.0/24 drop;
+		ct mark 0x1 and 0x1 accept;
+	}
+}
+
+# if only allow roule 
+table inet filter {
+	chain forward {
+		ct mark 0x1 and 0x1 ip saddr 93.202.132.0/24 accept;
+		ct mark 0x1 and 0x1 drop;
+	}
+}
+
+# if ingress rule exsists but no ip block
+table inet filter {
+	chain forward {
+		ct mark 0x1 and 0x1 drop;
+	}
+}
+
+
+is order important?
