@@ -2,28 +2,22 @@ https://kubernetes.io/docs/concepts/services-networking/network-policies/
 
 rules should look like this:
 
-# if only except roule 
 table inet filter {
 	chain forward {
-		ct mark 0x1 and 0x1 ip saddr 93.202.132.0/24 drop;
-		ct mark 0x1 and 0x1 accept;
+		ct mark 0x1 and 0x1 ip saddr 93.202.0.0/16 accept; # from cidr
+		ct mark 0x1 and 0x1 ip saddr 93.202.132.0/24 drop; # from except
+		ct mark 0x1 and 0x1 drop; # if ingress rule exists, no matter if it has ipblock or not
 	}
 }
-
-# if only allow roule 
-table inet filter {
-	chain forward {
-		ct mark 0x1 and 0x1 ip saddr 93.202.132.0/24 accept;
-		ct mark 0x1 and 0x1 drop;
-	}
-}
-
-# if ingress rule exsists but no ip block
-table inet filter {
-	chain forward {
-		ct mark 0x1 and 0x1 drop;
-	}
-}
-
 
 is order important?
+apparently no:
+> Network policies do not conflict; they are additive. If any policy or policies apply to a given pod for a given direction, the connections allowed in that direction from that pod is the union of what the applicable policies allow. Thus, order of evaluation does not affect the policy result.
+
+policies can have: cidr (allowed ip range), except, ports
+
+controller:
+* gather all networkPolicies that apply to this pod. # is there a helper for that?
+* if any(policies) has from.ipBlock: calc union of policies # is there a helper for that?
+    # IMPORTANT how are unions calculated? (union of cidrs) + (union of except) or union of (cidr+except) ? the docs seem to suggest the latter: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#networkpolicyingressrule-v1-networking-k8s-io
+  else: all traffic should be blocked. Do we even need to create a floating ip in this case?
