@@ -32,6 +32,14 @@ var (
 table {{ .FilterTableType }} {{ .FilterTableName }} {
 	chain {{ .FilterForwardChainName }} {
 		{{ range $fwd := .Forwards }}
+		{{ if ne ($fwd.IPBlocks | len) 0 }}
+			{{- range $block := $fwd.IPBlocks }}
+				{{- range $except := $block.Except}}
+		ct mark {{ $fwd.Mark }} ip saddr {{ $except }} drop;
+				{{- end }}
+		ct mark {{ $fwd.Mark }} ip saddr {{ $block.Cidr }} accept;
+			{{ end -}}
+		{{ end -}}
 		ct mark {{ $fwd.Mark }} {{ $fwd.DefaultPolicy }};
 		{{ end }}
 	}
@@ -41,7 +49,7 @@ table ip {{ .NATTableName }} {
 	chain {{ .NATPreroutingChainName }} {
 {{ range $fwd := .Forwards }}
 {{ if ne ($fwd.DestinationAddresses | len) 0 }}
-	ip daddr {{ $fwd.InboundIP }} {{ $fwd.Protocol }} dport {{ $fwd.InboundPort }} mark set {{ $fwd.Mark }} ct mark set meta mark dnat to numgen inc mod {{ $fwd.DestinationAddresses | len }} map {
+		ip daddr {{ $fwd.InboundIP }} {{ $fwd.Protocol }} dport {{ $fwd.InboundPort }} mark set {{ $fwd.Mark }} ct mark set meta mark dnat to numgen inc mod {{ $fwd.DestinationAddresses | len }} map {
 {{- range $index, $daddr := $fwd.DestinationAddresses }}{{ $index }} : {{ $daddr }}, {{ end -}}
 		} : {{ $fwd.DestinationPort }};
 {{ end }}
@@ -59,6 +67,11 @@ table ip {{ .NATTableName }} {
 	ErrProtocolNotSupported = fmt.Errorf("Protocol is not supported")
 )
 
+type nftablesIPBlock struct {
+	Cidr   string
+	Except []string
+}
+
 type nftablesForward struct {
 	Protocol             string
 	InboundIP            string
@@ -67,6 +80,7 @@ type nftablesForward struct {
 	DestinationPort      int32
 	DefaultPolicy        string
 	Mark                 int32
+	IPBlocks             []model.AllowedIPBlock // TODO: Use nftablesIPBlock instead of model
 }
 
 type nftablesConfig struct {
@@ -88,6 +102,15 @@ func copyAddresses(in []string) []string {
 	copy(result, in)
 	return result
 }
+
+// func copyAddressBlocks(in []model.AllowedIPBlock) []nftablesIPBlock {
+// 	result := make([]nftablesIPBlock, len(in))
+// 	for i, block := range in {
+// 		result[i].Cidr = block.Cidr
+// 		copy(result[i].Except, block.Except)
+// 	}
+// 	return result
+// }
 
 // Maps from k8s.io/api/core/v1.Protocol objects to strings understood by nftables
 func (g *NftablesGenerator) mapProtocol(k8sproto corev1.Protocol) (string, error) {
@@ -126,6 +149,8 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 			addrs := copyAddresses(port.DestinationAddresses)
 			sort.Strings(addrs)
 
+			// ipblocks := copyAddressBlocks(port.AllowedIPBlocks)
+
 			result.Forwards = append(result.Forwards, nftablesForward{
 				Protocol:             mappedProtocol,
 				InboundIP:            ingress.Address,
@@ -134,6 +159,7 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 				DestinationPort:      port.DestinationPort,
 				DefaultPolicy:        port.DefaultPolicy,
 				Mark:                 mark,
+				IPBlocks:             port.AllowedIPBlocks,
 			})
 		}
 	}

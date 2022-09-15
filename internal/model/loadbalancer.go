@@ -20,6 +20,11 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
+type AllowedIPBlock struct {
+	Cidr   string   `json:"cidr"`
+	Except []string `json:"except"`
+}
+
 type PortForward struct {
 	Protocol             corev1.Protocol  `json:"protocol"`
 	InboundPort          int32            `json:"inbound-port"`
@@ -27,6 +32,7 @@ type PortForward struct {
 	DestinationPort      int32            `json:"destination-port"`
 	Policy               string           `json:"policy"`
 	DefaultPolicy        string           `json:"default-policy"`
+	AllowedIPBlocks      []AllowedIPBlock `json:"allowed-ip-blocks"`
 }
 
 type IngressIP struct {
