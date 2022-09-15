@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
+	"strings"
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
@@ -164,6 +166,18 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 			default:
 				return nil, fmt.Errorf("Invalid value for DefaultPolicy: %s", default_policy)
 			}
+
+			sort.SliceStable(port.AllowedIPBlocks, func(i, j int) bool {
+				blockA := port.AllowedIPBlocks[i]
+				blockB := port.AllowedIPBlocks[j]
+
+				getHostBytes := func(addr string) (hostBytes int, err error) {
+					s := strings.Split(addr, "/")
+					return strconv.Atoi(s[1])
+				}
+				// TODO: what if it fails? .. wee need to check incoming data earlier
+
+			})
 
 			result.Forwards = append(result.Forwards, nftablesForward{
 				Protocol:             mappedProtocol,
