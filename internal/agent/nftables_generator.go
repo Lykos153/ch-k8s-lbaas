@@ -31,7 +31,9 @@ var (
 {{ $cfg := . }}
 table {{ .FilterTableType }} {{ .FilterTableName }} {
 	chain {{ .FilterForwardChainName }} {
-		ct mark {{ $cfg.FWMarkBits | printf "0x%x" }} and {{ $cfg.FWMarkMask | printf "0x%x" }} accept;
+		{{ range $fwd := .Forwards }}
+		ct mark {{ $fwd.Mark }} {{ $fwd.DefaultPolicy }};
+		{{ end }}
 	}
 }
 
@@ -39,7 +41,7 @@ table ip {{ .NATTableName }} {
 	chain {{ .NATPreroutingChainName }} {
 {{ range $fwd := .Forwards }}
 {{ if ne ($fwd.DestinationAddresses | len) 0 }}
-	ip daddr {{ $fwd.InboundIP }} {{ $fwd.Protocol }} dport {{ $fwd.InboundPort }} mark set {{ $cfg.FWMarkBits | printf "0x%x" }} and {{ $cfg.FWMarkMask | printf "0x%x" }} ct mark set meta mark dnat to numgen inc mod {{ $fwd.DestinationAddresses | len }} map {
+	ip daddr {{ $fwd.InboundIP }} {{ $fwd.Protocol }} dport {{ $fwd.InboundPort }} mark set {{ $fwd.Mark }} ct mark set meta mark dnat to numgen inc mod {{ $fwd.DestinationAddresses | len }} map {
 {{- range $index, $daddr := $fwd.DestinationAddresses }}{{ $index }} : {{ $daddr }}, {{ end -}}
 		} : {{ $fwd.DestinationPort }};
 {{ end }}
@@ -47,7 +49,9 @@ table ip {{ .NATTableName }} {
 	}
 
 	chain {{ .NATPostroutingChainName }} {
-		mark {{ $cfg.FWMarkBits | printf "0x%x" }} and {{ $cfg.FWMarkMask | printf "0x%x" }} masquerade;
+		{{ range $fwd := .Forwards }}
+		mark {{ $fwd.Mark }} masquerade;
+		{{ end }}
 	}
 }
 `))
@@ -61,6 +65,8 @@ type nftablesForward struct {
 	InboundPort          int32
 	DestinationAddresses []string
 	DestinationPort      int32
+	DefaultPolicy        string
+	Mark                 int32
 }
 
 type nftablesConfig struct {
@@ -109,8 +115,11 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 		Forwards:                []nftablesForward{},
 	}
 
+	var mark int32 = 0
 	for _, ingress := range m.Ingress {
 		for _, port := range ingress.Ports {
+			mark += 1
+
 			mappedProtocol, err := g.mapProtocol(port.Protocol)
 			if err != nil {
 				return nil, err
@@ -125,6 +134,8 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 				InboundPort:          port.InboundPort,
 				DestinationAddresses: addrs,
 				DestinationPort:      port.DestinationPort,
+				DefaultPolicy:        port.DefaultPolicy,
+				Mark:                 mark,
 			})
 		}
 	}

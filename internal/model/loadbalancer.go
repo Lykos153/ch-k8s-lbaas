@@ -21,11 +21,12 @@ import (
 )
 
 type PortForward struct {
-	Protocol             corev1.Protocol `json:"protocol"`
-	InboundPort          int32           `json:"inbound-port"`
-	DestinationAddresses []string        `json:"destination-addresses"`
-	DestinationPort      int32           `json:"destination-port"`
-	Policy               string          `json:"policy"`
+	Protocol             corev1.Protocol  `json:"protocol"`
+	InboundPort          int32            `json:"inbound-port"`
+	DestinationAddresses []string         `json:"destination-addresses"`
+	DestinationPort      int32            `json:"destination-port"`
+	Policy               string           `json:"policy"`
+	DefaultPolicy        string           `json:"default-policy"`
 }
 
 type IngressIP struct {
