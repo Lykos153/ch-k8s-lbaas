@@ -50,8 +50,6 @@ func TestNftablesStructuredConfigFromEmptyLBModel(t *testing.T) {
 	assert.Equal(t, g.Cfg.NATTableName, scfg.NATTableName)
 	assert.Equal(t, g.Cfg.NATPostroutingChainName, scfg.NATPostroutingChainName)
 	assert.Equal(t, g.Cfg.NATPreroutingChainName, scfg.NATPreroutingChainName)
-	assert.Equal(t, g.Cfg.FWMarkBits, scfg.FWMarkBits)
-	assert.Equal(t, g.Cfg.FWMarkMask, scfg.FWMarkMask)
 	assert.NotNil(t, scfg.Forwards)
 	assert.Equal(t, 0, len(scfg.Forwards))
 }
