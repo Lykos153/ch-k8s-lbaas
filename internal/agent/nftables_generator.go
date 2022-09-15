@@ -151,13 +151,27 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 
 			// ipblocks := copyAddressBlocks(port.AllowedIPBlocks)
 
+			var default_policy string
+			switch port.DefaultPolicy {
+			case "allow", "drop":
+				default_policy = port.DefaultPolicy
+			case "":
+				if len(port.AllowedIPBlocks) == 0 {
+					default_policy = "allow"
+				} else {
+					default_policy = "drop"
+				}
+			default:
+				return nil, fmt.Errorf("Invalid value for DefaultPolicy: %s", default_policy)
+			}
+
 			result.Forwards = append(result.Forwards, nftablesForward{
 				Protocol:             mappedProtocol,
 				InboundIP:            ingress.Address,
 				InboundPort:          port.InboundPort,
 				DestinationAddresses: addrs,
 				DestinationPort:      port.DestinationPort,
-				DefaultPolicy:        port.DefaultPolicy,
+				DefaultPolicy:        default_policy,
 				Mark:                 mark,
 				IPBlocks:             port.AllowedIPBlocks,
 			})
