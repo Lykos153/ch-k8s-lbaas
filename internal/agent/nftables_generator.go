@@ -171,12 +171,19 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 				blockA := port.AllowedIPBlocks[i]
 				blockB := port.AllowedIPBlocks[j]
 
-				getHostBytes := func(addr string) (hostBytes int, err error) {
+				getHostBytes := func(addr string) (hostBytes int) {
 					s := strings.Split(addr, "/")
-					return strconv.Atoi(s[1])
+					r, err := strconv.Atoi(s[1])
+					if err != nil {
+						panic("kapuuuut")
+						// TODO: what if it fails? .. wee need to check incoming data earlier
+					}
+					return r
 				}
-				// TODO: what if it fails? .. wee need to check incoming data earlier
 
+				isSmallerCidr := getHostBytes(blockA.Cidr) > getHostBytes(blockB.Cidr)
+
+				return isSmallerCidr
 			})
 
 			result.Forwards = append(result.Forwards, nftablesForward{
