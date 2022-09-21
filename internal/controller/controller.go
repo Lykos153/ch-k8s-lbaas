@@ -177,12 +177,12 @@ func NewController(
 	// TODO: can be nil here. How CAN it actually become nil?
 	if networkPoliciesInformer != nil {
 		networkPoliciesInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: controller.handleObject,
+			AddFunc: controller.handleAuxUpdated,
 			UpdateFunc: func(old, new interface{}) {
 				klog.Info("UpdateFunc called")
-				controller.handleObject(new)
+				controller.handleAuxUpdated(new)
 			},
-			DeleteFunc: controller.deleteObject,
+			DeleteFunc: controller.handleAuxUpdated,
 		})
 	}
 
