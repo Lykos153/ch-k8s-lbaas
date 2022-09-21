@@ -18,6 +18,9 @@ import (
 	goerrors "errors"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	networkinglisters "k8s.io/client-go/listers/networking/v1"
 
@@ -36,18 +39,21 @@ type PodLoadBalancerModelGenerator struct {
 	services        corelisters.ServiceLister
 	networkpolicies networkinglisters.NetworkPolicyLister
 	endpoints       corelisters.EndpointsLister
+	pods            corelisters.PodLister
 }
 
 func NewPodLoadBalancerModelGenerator(
 	l3portmanager openstack.L3PortManager,
 	services corelisters.ServiceLister,
 	endpoints corelisters.EndpointsLister,
-	networkpolicies networkinglisters.NetworkPolicyLister) *PodLoadBalancerModelGenerator {
+	networkpolicies networkinglisters.NetworkPolicyLister,
+	pods corelisters.PodLister) *PodLoadBalancerModelGenerator {
 	return &PodLoadBalancerModelGenerator{
 		l3portmanager:   l3portmanager,
 		services:        services,
 		endpoints:       endpoints,
 		networkpolicies: networkpolicies,
+		pods:            pods,
 	}
 }
 
@@ -75,8 +81,44 @@ func (g *PodLoadBalancerModelGenerator) findPort(subset *corev1.EndpointSubset, 
 	return -1, errPortNotFoundInSubset
 }
 
+func containsPort(port int32, proto *corev1.Protocol, portList []networkingv1.NetworkPolicyPort) bool {
+	for _, p := range portList {
+		if *p.Protocol == *proto &&
+			((p.EndPort == nil && p.Port.IntVal == port) ||
+				(p.EndPort != nil && p.Port.IntVal <= port && *p.EndPort >= port)) {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *PodLoadBalancerModelGenerator) GenerateModel(portAssignment map[string]string) (*model.LoadBalancer, error) {
 	result := &model.LoadBalancer{}
+
+	policyMap := map[string][]networkingv1.NetworkPolicyIngressRule{} // dest addr => ingress ipBlock
+	allPolicies, err := g.networkpolicies.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	for _, pol := range allPolicies {
+		if len(pol.Spec.Ingress) == 0 {
+			continue
+		}
+		selector, err := metav1.LabelSelectorAsSelector(&pol.Spec.PodSelector)
+		if err != nil {
+			return nil, err
+		}
+
+		pods, err := g.pods.Pods(pol.Namespace).List(selector)
+		if err != nil {
+			return nil, err
+		}
+		for _, pod := range pods {
+			for _, addr := range pod.Status.PodIPs {
+				policyMap[addr.IP] = pol.Spec.Ingress
+			}
+		}
+	}
 
 	ingressMap := map[string]model.IngressIP{}
 
@@ -140,9 +182,28 @@ func (g *PodLoadBalancerModelGenerator) GenerateModel(portAssignment map[string]
 				continue
 			}
 
+			defaultPolicy := "accept"
 			addresses := make([]string, len(epSubset.Addresses))
+			allowedBlocks := make([]model.AllowedIPBlock, len(policyMap))
 			for i, addr := range epSubset.Addresses {
 				addresses[i] = addr.IP
+				if rules, exists := policyMap[addr.IP]; exists {
+					defaultPolicy = "drop"
+					for _, rule := range rules {
+						if len(rule.Ports) == 0 ||
+							containsPort(svcPort.Port, &svcPort.Protocol, rule.Ports) {
+							for _, peer := range rule.From {
+								if peer.IPBlock == nil {
+									continue
+								}
+								allowedBlocks = append(allowedBlocks, model.AllowedIPBlock{
+									Cidr:   peer.IPBlock.CIDR,
+									Except: peer.IPBlock.Except,
+								})
+							}
+						}
+					}
+				}
 			}
 
 			ingress.Ports = append(ingress.Ports, model.PortForward{
@@ -150,6 +211,8 @@ func (g *PodLoadBalancerModelGenerator) GenerateModel(portAssignment map[string]
 				InboundPort:          svcPort.Port,
 				DestinationPort:      destinationPort,
 				DestinationAddresses: addresses,
+				DefaultPolicy:        defaultPolicy,
+				AllowedIPBlocks:      allowedBlocks,
 			})
 		}
 

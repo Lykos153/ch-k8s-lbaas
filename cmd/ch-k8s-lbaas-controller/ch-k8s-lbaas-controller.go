@@ -92,6 +92,7 @@ func main() {
 	nodesInformer := kubeInformerFactory.Core().V1().Nodes()
 	endpointsInformer := kubeInformerFactory.Core().V1().Endpoints()
 	networkPoliciesInformer := kubeInformerFactory.Networking().V1().NetworkPolicies()
+	podsInformer := kubeInformerFactory.Core().V1().Pods() // TODO: I don't want to be informed about pods. Just need to list them
 
 	modelGenerator, err := controller.NewLoadBalancerModelGenerator(
 		fileCfg.BackendLayer,
@@ -100,6 +101,7 @@ func main() {
 		nodesInformer.Lister(),
 		endpointsInformer.Lister(),
 		networkPoliciesInformer.Lister(),
+		podsInformer.Lister(),
 	)
 
 	if fileCfg.BackendLayer != config.BackendLayerNodePort {

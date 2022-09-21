@@ -61,6 +61,7 @@ func (f *podGeneratorFixture) newGenerator() (*PodLoadBalancerModelGenerator, ku
 	services := k8sI.Core().V1().Services()
 	endpoints := k8sI.Core().V1().Endpoints()
 	networkpolicies := k8sI.Networking().V1().NetworkPolicies()
+	pods := k8sI.Core().V1().Pods()
 
 	for _, s := range f.serviceLister {
 		services.Informer().GetIndexer().Add(s)
@@ -79,6 +80,7 @@ func (f *podGeneratorFixture) newGenerator() (*PodLoadBalancerModelGenerator, ku
 		services.Lister(),
 		endpoints.Lister(),
 		networkpolicies.Lister(),
+		pods.Lister(),
 	)
 	return g, k8sI
 }

@@ -35,7 +35,8 @@ func NewLoadBalancerModelGenerator(
 	services corelisters.ServiceLister,
 	nodes corelisters.NodeLister,
 	endpoints corelisters.EndpointsLister,
-	networkpolicies networkinglisters.NetworkPolicyLister) (LoadBalancerModelGenerator, error) {
+	networkpolicies networkinglisters.NetworkPolicyLister,
+	pods corelisters.PodLister) (LoadBalancerModelGenerator, error) {
 	switch backendLayer {
 	case config.BackendLayerNodePort:
 		return NewNodePortLoadBalancerModelGenerator(
@@ -47,7 +48,7 @@ func NewLoadBalancerModelGenerator(
 		), nil
 	case config.BackendLayerPod:
 		return NewPodLoadBalancerModelGenerator(
-			l3portmanager, services, endpoints, networkpolicies,
+			l3portmanager, services, endpoints, networkpolicies, pods,
 		), nil
 	default:
 		return nil, fmt.Errorf("invalid backend type: %q", backendLayer)
