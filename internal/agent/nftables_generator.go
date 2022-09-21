@@ -176,7 +176,7 @@ func (g *NftablesGenerator) GenerateStructuredConfig(m *model.LoadBalancer) (*nf
 					r, err := strconv.Atoi(s[1])
 					if err != nil {
 						panic("kapuuuut")
-						// TODO: what if it fails? .. wee need to check incoming data earlier
+						// TODO: what if it fails? .. we need to check incoming data earlier
 					}
 					return r
 				}
