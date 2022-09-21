@@ -21,3 +21,27 @@ controller:
 * if any(policies) has from.ipBlock: calc union of policies # is there a helper for that?
     # IMPORTANT how are unions calculated? (union of cidrs) + (union of except) or union of (cidr+except) ? the docs seem to suggest the latter: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#networkpolicyingressrule-v1-networking-k8s-io
   else: all traffic should be blocked. Do we even need to create a floating ip in this case?
+
+
+== controller ==
+problem: service has selector, networkpolicy has selector. Starting at the service, I need to find the policies that are relevant for the pods behind the endpoints.
+
+ways to find pods from service:
+1. start with service and list pods using selector (hopefully there is a function for that)
+2. start with endpoint and get pods by IP
+
+ways to find network policies:
+1. do a reverse search from the pod: list all policies that apply to this pod IF there is a function for this
+2. iterate through all network policies, get pods by selectors
+
+
+idea for first draft:
+* iterate through all networkpolicies
+  * skip those that only have egress rules
+  * store ingress ip blocks (or that there is none)
+  * get pods by selector
+  * iterate through pods
+    * iterate through ips
+      * store map: pod IP => ingress ip block
+* add to endpoint handling:
+	=> check if there is an entry for this IP inside the network policy map
