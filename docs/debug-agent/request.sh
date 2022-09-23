@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+make -C ../.. ch-k8s-lbaas-agent
 ../../ch-k8s-lbaas-agent -logtostderr -v 5 -config $PWD/agent-config.toml&
 agent_pid=$!
 
