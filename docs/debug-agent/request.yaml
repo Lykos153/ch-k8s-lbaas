@@ -8,32 +8,39 @@ load-balancer-config:
             - 10.9.8.7
             - 10.9.8.6
           destination-port: 8080
-        - protocol: TCP
-          inbound-port: 22
-          destination-addresses:
-            - 10.9.8.7
-            - 10.9.8.6
-          destination-port: 2222
-        - protocol: TCP
-          inbound-port: 6443
-          destination-addresses:
-            - 10.0.8.7
-            - 10.0.8.6
-          destination-port: 6443
+        # - protocol: TCP
+        #   inbound-port: 22
+        #   destination-addresses:
+        #     - 10.9.8.7
+        #     - 10.9.8.6
+        #   destination-port: 2222
+        # - protocol: TCP
+        #   inbound-port: 6443
+        #   destination-addresses:
+        #     - 10.0.8.7
+        #     - 10.0.8.6
+        #   destination-port: 6443
   policy-assignments:
     - address: 10.9.8.7
       network-policies:
       - pol1
-    - address: 10.0.8.7
+    - address: 10.10.2.1
       network-policies:
       - pol1
       - pol2
-    - address: 10.0.8.6
-      network-policies:
-      - pol1
-      - pol2
+    # - address: 10.0.8.6
+    #   network-policies:
+    #   - pol1
+    #   - pol2
   network-policies:
     - name: pol1
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 8080
+          end-port: 8090
+        - protocol: UDP
       allowed-ip-blocks:
         - cidr: 185.187.0.0/16
           except: 
