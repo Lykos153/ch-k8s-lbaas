@@ -21,9 +21,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"os"
+
 	"github.com/cloudandheat/ch-k8s-lbaas/internal/config"
 	"github.com/cloudandheat/ch-k8s-lbaas/internal/model"
-	"os"
 )
 
 func newNftablesGenerator() *NftablesGenerator {
@@ -92,6 +93,29 @@ func TestNftablesStructuredConfigFromNonEmptyLBModel(t *testing.T) {
 						Protocol:             corev1.ProtocolUDP,
 						DestinationPort:      30053,
 						DestinationAddresses: []string{"192.168.0.1", "192.168.0.2"},
+					},
+				},
+			},
+		},
+		NetworkPolicies: []model.NetworkPolicy{
+			{
+				Name: "allow-http",
+				Ports: []model.PolicyPort{
+					{
+						Protocol: corev1.ProtocolTCP,
+						Port:     func(i int32) *int32 { return &i }(80),
+					},
+				},
+			},
+			{
+				Name: "block-range",
+				AllowedIPBlocks: []model.AllowedIPBlock{
+					{
+						Cidr: "0.0.0.0/0",
+						Except: []string{
+							"192.168.2.0/24",
+							"192.168.178.0/24",
+						},
 					},
 				},
 			},
