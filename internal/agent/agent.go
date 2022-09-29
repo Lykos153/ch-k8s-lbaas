@@ -274,7 +274,7 @@ func (h *ApplyHandlerv1) preflightCheck(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ApplyHandlerv1) ProcessRequest(lbcfg *model.LoadBalancer) (int, string) {
-	klog.V(1).Infof("received config: %#v", lbcfg)
+	klog.Infof("received config: %#v", lbcfg)
 
 	changed, err := h.KeepalivedConfig.WriteWithRollback(lbcfg)
 	if err != nil {
