@@ -45,3 +45,11 @@ idea for first draft:
       * store map: pod IP => ingress ip block
 * add to endpoint handling:
 	=> check if there is an entry for this IP inside the network policy map
+
+
+TODOs:
+* generator: don't create chain if there is no except
+* formatting of nftables.conf
+* handle default policy
+  problem: we cannot have a default policy in the network-policy chain because the packet might be handled by a different policy. but if we have policies for it, we must drop it in the end.
+  idea: add new mark to every packet that has seen at least one network policy. then in the end drop all thus marked
