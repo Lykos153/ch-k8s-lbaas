@@ -53,3 +53,17 @@ TODOs:
 * handle default policy
   problem: we cannot have a default policy in the network-policy chain because the packet might be handled by a different policy. but if we have policies for it, we must drop it in the end.
   idea: add new mark to every packet that has seen at least one network policy. then in the end drop all thus marked
+
+
+Open questions:  
+* I don't want to be informed about pods. Just need to list them
+* Is this the way to deep copy structs in go?
+* what about the mask? what's it for and do I need to add `npmark-mask`?
+* what is the field 'Policy' in the model for?
+* where to put the test script. own PR?
+~
+~
+~
+~
+~
+~
