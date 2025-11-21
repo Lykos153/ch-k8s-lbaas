@@ -78,7 +78,8 @@ table {{ .FilterTableType }} {{ .FilterTableName }} {
 		{{- range $dest := $cfg.PolicyAssignments }}
 		ct mark {{ $cfg.FWMarkBits | printf "0x%x" }} and {{ $cfg.FWMarkMask | printf "0x%x" }} {{if isIPv4Address $dest.Address }}ip{{else if isIPv6Address $dest.Address}}ip6{{end}} daddr {{ $dest.Address }} goto {{ $cfg.PolicyPrefix }}POD-{{replaceColons $dest.Address}};
 		{{- end }}
-		ct mark {{ $cfg.FWMarkBits | printf "0x%x" }} and {{ $cfg.FWMarkMask | printf "0x%x" }} accept;
+		ct mark {{ $cfg.FWMarkBits | printf "0x%x" }} and {{ $cfg.FWMarkMask | printf "0x%x" }} udp dport 1-65535 accept;
+		ct mark {{ $cfg.FWMarkBits | printf "0x%x" }} and {{ $cfg.FWMarkMask | printf "0x%x" }} drop;
 	}
 
 	# Using uppercase POD to prevent collisions with policy names like 'pod-x.x.x.x'
